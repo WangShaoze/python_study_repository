@@ -1,15 +1,16 @@
 from logger import *
 
 
-@Logger("%Y/%m/d %H:%M:%S")
-@LogPath("./")  # @LogConfig
+def hello():
+    log.info('hello')
+
+
 def test(n, m):
+    hello()
     log.info("m={},n={}", m, n)
     return n * m
 
 
-@Logger("%Y-%m-%d %H:%M:%S")
-@LogPath("./")  # @LogConfig
 def test1(x, y, z):
     log.info("init ==>[x={}, y={}, z={}]".format(x, y, z))
     for i in range(x, z):
@@ -19,8 +20,6 @@ def test1(x, y, z):
     return x + y + z
 
 
-@Logger("%Y-%m-%d %H:%M:%S")
-@LogPath("./")  # @LogConfig
 def test2(x, y):
     try:
         for _ in range(10):
@@ -35,8 +34,9 @@ def test2(x, y):
         log.critical("出错了， 0 不可以作为除数!")
 
 
-@Logger("%Y-%m-%d %H:%M:%S")
-@LogPath("./")  # @LogConfig
+# @Logger("./log_config.cnf", "%Y-%m-%d-%H:%M:%S", "test_app.log")
+@Logger("./log_config.cnf", time_formate="%Y-%m-%d-%H:%M:%S", log_filename="test_app.log")
+@LogStart
 def main():
     log.info("开始执行test函数...")
     print(test(4, 5))

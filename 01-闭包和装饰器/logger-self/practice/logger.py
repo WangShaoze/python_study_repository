@@ -1,9 +1,8 @@
+import os
+import sys
 import time
 import inspect
-import sys
-import os
-
-log_output: type
+import threading
 
 
 class Color:
@@ -13,6 +12,9 @@ class Color:
     RED = '\033[91m'
     PURPLE = '\033[95m'
     RESET = "\033[0m"  # 结束值
+
+
+log_output: type
 
 
 class Log:
@@ -47,28 +49,48 @@ class Log:
         log_output(caller_name, "CRITICAL", message, *args, **kwargs)
 
 
-log: Log  # 类或者方法
+log: Log
 
 
 class Logger:
+    _instance = None
+    _lock = threading.Lock()
     fo = None
     stdout = sys.stdout
 
-    def __init__(self, time_format: str = "%Y-%m-%d %H:%M:%S"):
-        self.time_format = time_format
+    def __new__(cls, *args, **kwargs):
+        with cls._lock:
+            if not cls._instance:
+                cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self, config_path: str = None, *args, **kwargs):
+        self.time_formate = "%Y%m%d %H%M%S"
+        self.log_filename = None
         self.func = None
+        try:
+            if args:
+                self.time_formate = args[0]
+            if "time_formate" in kwargs:
+                self.time_formate = kwargs["time_formate"]
+            if args and len(args) == 2:
+                self.log_filename = args[1]
+            if "log_filename" in kwargs:
+                self.log_filename = kwargs["log_filename"]
+            if config_path:
+                log_path = self.get_log_path(config_path)
+                self.set_fo(log_path)
+        except Exception as e:
+            print(e)
 
     def set_fo(self, log_path_dir):
-        if self.fo is None:
-            if os.path.exists(log_path_dir):
-                if os.path.isdir(log_path_dir):
-                    self.fo = open("{}/{}_app.log".format(log_path_dir, time.strftime("%Y%m%d-%H%M%S")), mode="a+",
-                                   encoding="utf-8")
-                else:
-                    raise "log_path_dir should be a directory"
-            else:
-                raise "log_path_dir not exist"
-        return self
+        if not self.fo and os.path.exists(log_path_dir) and os.path.isdir(log_path_dir):
+            log_file_path = os.path.join(log_path_dir,
+                                         "{}_{}".format(time.strftime("%Y%m%d-%H%M%S"), self.log_filename))
+            self.fo = open(log_file_path, mode="a+", encoding="utf-8")
+
+    def set_time_formate(self, time_formate):
+        self.time_formate = time_formate
 
     def _log(self, caller, log_level, message: str, *args, **kwargs):
         color = Color.WHITE
@@ -83,13 +105,24 @@ class Logger:
         if log_level == "CRITICAL":
             color = Color.PURPLE
         if len(args) > 0 or len(kwargs) > 0:
-            print("{}[{}] function:[{}] {} [{}]{}".format(color, time.strftime(self.time_format), caller, log_level,
+            print("{}[{}] function:[{}] {} [{}]{}".format(color, time.strftime(self.time_formate), caller, log_level,
                                                           message.format(*args, **kwargs), Color.RESET))
         else:
-            print("{}[{}] function:[{}] {} [{}]{}".format(color, time.strftime(self.time_format), caller, log_level,
+            print("{}[{}] function:[{}] {} [{}]{}".format(color, time.strftime(self.time_formate), caller, log_level,
                                                           message, Color.RESET))
 
-    def inner(self, *args, **kwargs):
+    @staticmethod
+    def get_log_path(log_config_path):
+        with open(log_config_path, "r", encoding="utf-8") as f:
+            d = f.read()
+            for u in d.split("[**>]"):
+                if "log_path:" in u.strip("[**]"):
+                    return u.split("log_path:")[1]
+            else:
+                raise "log_path not exist"
+
+    def wrapper(self, *args, **kwargs):
+        func = self.func
         global log, log_output
         fg = inspect.currentframe().f_back.f_globals  # 栈帧的操作 ===> 获取到执行 test 的模块
         try:
@@ -97,7 +130,7 @@ class Logger:
                 log = Log
                 fg["log"] = log
             log_output = self._log
-            rsl = self.func(*args, **kwargs)
+            rsl = func(*args, **kwargs)
             return rsl
         except Exception as e:
             log.critical("函数执行出错...")
@@ -105,9 +138,9 @@ class Logger:
         finally:
             pass
 
-    def __call__(self, func: type):
+    def __call__(self, func):
         self.func = func
-        return self.inner
+        return self.wrapper
 
     @staticmethod
     def replace(text: str):
@@ -135,69 +168,29 @@ class Logger:
             self.fo.close()
 
 
-def log_path(log_path_dir: str):
-    def outer(func: type):
-        def inner(*args, **kwargs):
-            sys.stdout = Logger().set_fo(log_path_dir)
-            rsl = func(*args, **kwargs)
-            sys.stdout = sys.__stdout__
-            return rsl
-
-        return inner
-
-    return outer
-
-
-LogPath = log_path
-
-
-def log_config(func: type):
-    _log_path = None
-
-    def get_log_path():
-        nonlocal _log_path
-        with open("./log_config.cnf", "r", encoding="utf-8") as f:
-            d = f.read()
-            for u in d.split("[**>]"):
-                if "log_path:" in u.strip("[**]"):
-                    _log_path = u.split("log_path:")[1]
-                    break
-            else:
-                raise "log_path not exist"
-
+def log_start(func: type):
     def inner(*args, **kwargs):
-        if _log_path:
-            sys.stdout = Logger().set_fo(_log_path)
-            rsl = func(*args, **kwargs)
-            sys.stdout = sys.__stdout__
-        else:
-            raise "log_path not exist, decorate not succeed"
+        sys.stdout = Logger()
+        rsl = func(*args, **kwargs)
+        sys.stdout = sys.__stdout__
         return rsl
 
-    if not _log_path:
-        get_log_path()
     return inner
 
 
-LogConfig = log_config
+LogStart = log_start
 
-# @Logger(
-#     "%Y-%m-%d %H:%M:%S")  # logger = Logger()  ==> @logger ==> inner = logger(test) ===> test = inner ===> test(name)
-# def test(name: str):
-#     log.info("我是{}, 我今年{}岁, 毕业于{}", name, 23, "四川大学")
-#
-#
-# @Logger(
-#     "%Y-%m-%d %H:%M:%S")  # logger = Logger()  ==> @logger ==> inner = logger(test) ===> test = inner ===> test(name)
-# @LogPath("./")
-# def test2(name: str):
-#     log.info("我是{}, 我今年{}岁, 毕业于{}", name, 23, "四川大学")
-#     log.debug("我是{}, 我今年{}岁, 毕业于{}", name, 23, "四川大学")
-#     log.warning("我是{}, 我今年{}岁, 毕业于{}", name, 23, "四川大学")
-#     log.error("我是{}, 我今年{}岁, 毕业于{}", name, 23, "四川大学")
-#     log.critical("我是{}, 我今年{}岁, 毕业于{}", name, 23, "四川大学")
-#
+if __name__ == "__main__":
+    def example_function():
+        log.info("Inside the function")
 
-# if __name__ == "__main__":
-#     test("胡歌")
-#     test2("刘涛")
+
+    @Logger(config_path="./log_config.cnf", time_formate="%Y-%m-%d-%H:%M:%S")
+    @LogStart
+    def main():
+        log.info("Inside the function")
+        example_function()
+        log.info("Inside the function")
+
+
+    main()
