@@ -1,0 +1,7 @@
+[2025-04-03 11:12:08] FUNC:[test1], LINE:[11] INFO [fdsfd]
+[2025-04-03 11:12:08] FUNC:[test2], LINE:[6] INFO [你好]
+[2025-04-03 11:12:08] FUNC:[test], LINE:[22] INFO [你好，这是test函数...]
+[2025-04-03 11:12:08] FUNC:[test], LINE:[23] DEBUG [n:12]
+[2025-04-03 11:12:08] FUNC:[test], LINE:[24] WARN [n:12]
+[2025-04-03 11:12:08] FUNC:[test], LINE:[25] ERROR [n:12]
+[2025-04-03 11:12:08] FUNC:[test], LINE:[26] CRITICAL [n:12]
