@@ -1,0 +1,16 @@
+
+@Logger(time_format="%Y-%m-%d-%H:%M:%S")   # 这里传入的都是配置项
+1.  [类装饰器创建对象] logger = Logger(time_format="%Y-%m-%d-%H:%M:%S")
+2.  [装饰目标函数并返回装饰后的函数] @logger   ==> 装饰后的函数 = logger(被装饰函数)  <==> wrapper = logger(test)  
+3.  [装饰后的函数替换原来的目标函数] test =  wrapper 
+
+那么如何判断 wrapper 需要传入的参数有哪些呢？
+
+wrapper 最后是要替换原来的test函数，原因是装饰器不会改变 原来那个函数的执行方式，所以 test函数的执行方式是: test(10),装饰以后执行方式依然是: test(10) 
+所以在装饰以后:  test(10)  <==> wrapper(10)
+
+@Log
+1. [将目标函数传入并创建对象] log = Log(test1)
+2. [对象覆盖目标函数] test1 = log
+3. [等待执行目标函数] test1(*args, **kwargs)  <==> log(*args, **kwargs) <==> __call__(*args, **kwargs)
+/home/wangshaoze/desktop
